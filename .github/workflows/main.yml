@@ -1,0 +1,39 @@
+name: Assume IAM Role
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  aws:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Assume IAM Role
+        id: assume-role
+        run: |
+          assume_role_output=$(aws sts assume-role \
+            --role-arn arn:aws:iam::683350395763:role/sts-lab-2-target \
+            --role-session-name GitHubActionsSession)
+          aws_access_key_id=$(echo "$assume_role_output" | jq -r '.Credentials.AccessKeyId')
+          aws_secret_access_key=$(echo "$assume_role_output" | jq -r '.Credentials.SecretAccessKey')
+          aws_session_token=$(echo "$assume_role_output" | jq -r '.Credentials.SessionToken')
+          echo "::set-output name=AWS_ACCESS_KEY_ID::$aws_access_key_id"
+          echo "::set-output name=AWS_SECRET_ACCESS_KEY::$aws_secret_access_key"
+          echo "::set-output name=AWS_SESSION_TOKEN::$aws_session_token"
+
+      - name: Use AWS Credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.assume-role.outputs.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.assume-role.outputs.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ steps.assume-role.outputs.AWS_SESSION_TOKEN }}
+        run: |
+          # Use AWS CLI with assumed credentials
+          aws sts get-caller-identity
